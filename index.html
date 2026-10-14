@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manager for a Day</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--text:#f1f5f9;--mute:#94a3b8;--acc:#38bdf8;--good:#34d399;--mid:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:17px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+main{max-width:700px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:2.2rem;margin:.2em 0}h2{margin:.2em 0 .5em;font-size:1.3rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0}
+.mute{color:var(--mute)}.small{font-size:.9rem}
+button,input{font:inherit}
+.btn{background:var(--acc);color:#082f49;border:0;border-radius:12px;padding:12px 22px;font-weight:700;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}.btn.alt{background:transparent;color:var(--text);border:1px solid var(--line)}
+input[type=text]{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0b1222;color:var(--text);margin:8px 0}
+.opt{display:block;width:100%;text-align:left;background:#0b1222;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0;cursor:pointer}
+.opt:hover:enabled{border-color:var(--acc)}.opt:disabled{cursor:default}
+.opt.best{border-color:var(--good);background:#064e3b55}.opt.ok{border-color:var(--mid);background:#78350f44}.opt.poor{border-color:var(--bad);background:#7f1d1d44}
+.opt.picked{outline:2px solid var(--text)}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}.bar>div{height:100%;background:var(--acc);transition:width .3s}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.1rem}
+.pts{font-weight:700;color:var(--mid);position:relative}
+.pop{position:absolute;right:0;top:0;color:var(--good);font-weight:800;animation:pop 1s ease-out forwards;pointer-events:none}
+@keyframes pop{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-28px)}}
+.err{color:var(--bad);min-height:1.5em}
+.big{font-size:4rem;font-weight:800;color:var(--acc);line-height:1}
+.fb b.g{color:var(--good)}.fb b.m{color:var(--mid)}.fb b.b{color:var(--bad)}
+.team{display:flex;gap:12px;align-items:center;border-left:5px solid var(--tc,var(--acc));background:#0b1222;border-radius:12px;padding:10px 14px;margin-bottom:14px}
+.team .ic{font-size:2rem}.team b{display:block}
+.tag{display:inline-block;background:var(--tc);color:#0b1222;border-radius:99px;padding:1px 10px;font-weight:800;font-size:.8rem;margin-right:6px}
+.stamps{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0}
+.stamp{border:2px dashed var(--tc);color:var(--tc);border-radius:12px;padding:6px 10px;font-weight:800;transform:rotate(-3deg)}
+.stamp:nth-child(even){transform:rotate(3deg)}
+.meet{list-style:none;padding:0;margin:0}.meet li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.meet li:last-child{border:0}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+"use strict";
+var GAME_NAME="Manager for a Day", VERSION="1.0", PER=100;
+var TEAMS={
+ RMS:{icon:"🎓",color:"#a78bfa",line:"Resources, budget and training",what:"We look after people, budget and training, so every team has what it needs to do its job."},
+ OPRISK:{icon:"🛡️",color:"#fb923c",line:"Spotting what could go wrong",what:"We look for things that could go wrong, such as mistakes, broken processes, system failures or outside events, before they cause losses."},
+ FMT:{icon:"🖥️",color:"#38bdf8",line:"Systems for treasury",what:"We build and look after the computer systems that our treasury (money-handling) teams use every day."},
+ DART:{icon:"📊",color:"#34d399",line:"Data and digital",what:"We look after the department's data and use it to find insights and make work more digital."},
+ FRM:{icon:"📈",color:"#f472b6",line:"Watching market risk",what:"We keep an eye on how risky our investments are, check we stay within the rules, report any breach to senior management, and explain how our investments performed."},
+ COMPLC:{icon:"⚖️",color:"#fbbf24",line:"Rules and conduct",what:"We make sure everyone follows the rules, the laws and our code of conduct."},
+ PMO:{icon:"🗂️",color:"#2dd4bf",line:"Project management",what:"We are the project managers. We keep projects on time, on budget, and make sure everyone knows who is doing what."}
+};
+var TEAM_ORDER=["RMS","OPRISK","FMT","DART","FRM","COMPLC","PMO"];
+var TEAM_LONG={RMS:"RMS",OPRISK:"OPRISK",FMT:"FMT",DART:"DART",FRM:"FRM",COMPLC:"COMPLC",PMO:"PMO"};
+/* Each option: [text, points, explanation]. 100 = best, 50 = partly right, 0 = risky. */
+var Q=[
+{team:"RMS",time:"09:00",t:"New joiners on Monday",s:"Two new colleagues start on Monday. It's Friday, and they don't have laptops, building passes or a training plan yet.",
+ o:[["Do nothing. They will work it out on their first day",0,"A bad first day sticks. Without a laptop or a pass they can't start, which wastes their time and the team's."],
+    ["Sort the laptops and passes today, build a first-week training plan, and tell their managers",100,"Correct. Having people, tools and training ready on day one is exactly what RMS is there for."],
+    ["Order the laptops today and leave the training plan until they arrive",50,"A good start, but without a training plan their first week will be wasted too."]]},
+{team:"OPRISK",time:"09:30",t:"The near miss",s:"A payment was almost sent twice because someone skipped a checking step. A colleague spotted it just in time, so no money was lost.",
+ o:[["Say nothing. No money was lost, so there's no problem",0,"A near miss is a free warning. The same slip could cost real money next time."],
+    ["Remind everyone to be more careful",50,"Reminders help for a week. Fixing the process helps for good."],
+    ["Write it up, find out why the step was skipped, and fix the process so it can't happen again",100,"Correct. Learning from near misses is how OPRISK stops real losses."]]},
+{team:"FMT",time:"10:00",t:"The frozen screen",s:"At 10:00 the screen our dealers use to move money freezes, and they need it now. Someone says: 'Just install the quick fix I found online!'",
+ o:[["Switch the dealers to the backup, tell everyone what's happening, then find and test a proper fix",100,"Correct. Keep the business running first, then fix it carefully and test it before going back."],
+    ["Install the quick fix on the live system right now",0,"An untested fix on a live system can turn a small problem into a big one."],
+    ["Restart it and hope it works",50,"It might work for now, but you won't know why it failed, so it will probably happen again."]]},
+{team:"DART",time:"10:30",t:"Two reports, two answers",s:"Two official-looking reports show different totals for the same thing. One says 120 and the other says 118.",
+ o:[["Pick the higher number to be safe",0,"That is a guess, not analysis. You don't know which one is right."],
+    ["Ask both report owners which number they trust",50,"Better than guessing, but they could both be wrong. Check the data itself."],
+    ["Trace both numbers back to the original data to find where they split, then fix it at the source",100,"Correct. Good data work finds the cause instead of choosing a winner."]]},
+{team:"FRM",time:"11:00",t:"Over the limit",s:"We have a rule: no more than 10% of our money in any one kind of investment. It works like a speed limit. A market move has just pushed us to 10.4%.",
+ o:[["Quietly adjust the numbers so it shows 9.9%",0,"Never do this. Hiding a breach is far worse than the breach itself."],
+    ["Tell your own manager and mention it at the next monthly meeting",50,"At least someone knows, but the management committee needs to hear about it promptly."],
+    ["Report it to the management committee straight away, with the facts and a proposed fix",100,"Correct. Reporting breaches quickly and honestly is a core part of FRM's job."]]},
+{team:"COMPLC",time:"12:00",t:"The free lunch",s:"A company hoping to win our business invites you to a fancy lunch and offers you an expensive gift bag. The contract decision is next month.",
+ o:[["Politely decline the gift and let Compliance know about the invitation",100,"Correct. It protects you and keeps the decision fair, and our code of conduct is built around that."],
+    ["Accept, but keep it quiet",0,"A gift from someone who wants our business can look like a bribe, even if you mean nothing by it."],
+    ["Accept the lunch and share the gift with your team",50,"Sharing doesn't fix it. The gift still came because of the contract."]]},
+{team:"FRM",time:"13:00",t:"Why did we gain?",s:"Our investments grew by 2% last month. The boss says: 'Great, but why?'",
+ o:[["Just say: 'It grew by 2%'",0,"A number on its own doesn't explain anything."],
+    ["Say: 'The markets were good this month'",50,"Partly true, but which markets, and which of our own choices helped?"],
+    ["Break the 2% into pieces, what came from the markets and what from our decisions, and check they add up to 2%",100,"Correct. Explaining where a gain came from is called performance attribution."]]},
+{team:"COMPLC",time:"14:00",t:"A new rule is coming",s:"A new regulation starts next month. Nobody has updated our checklists.",
+ o:[["Assume the old checklist still works",0,"New rules usually change something. Skipping the check is how breaches happen."],
+    ["Compare the new rule with what we do today, update the checklist, and tell each team what changes for them",100,"Correct. Turning rules into clear steps people can follow is what a compliance framework is for."],
+    ["Email everyone the new rule and leave them to work it out",50,"Better than nothing, but most people will not know what to change."]]},
+{team:"OPRISK",time:"15:00",t:"Only one person knows",s:"Only one colleague knows how a key daily process works. She's going on holiday for a month next week.",
+ o:[["Hope nothing goes wrong while she's away",0,"Hope is not a plan. If it breaks, nobody can fix it."],
+    ["Ask her to keep her phone on while she's away",50,"It helps, but it ruins her holiday and still leaves you depending on one person."],
+    ["Ask her to write down the steps and teach a back-up before she goes",100,"Correct. Depending on one person is a risk that comes from people, not from machines."]]},
+{team:"PMO",time:"16:00",t:"Just one more thing",s:"A project is on track to finish on time. Then a senior person says: 'Can we just add one more feature?'",
+ o:[["Say yes. It's only one small thing",0,"Small extras add up. Soon the project is late and over budget, and nobody agreed to it."],
+    ["Say no, flat out",50,"Protects the plan, but the idea might be worth doing. Check it first."],
+    ["Check what it would cost in time and money, show the owner, and agree the change before updating the plan",100,"Correct. Good project management says yes or no to changes with the facts on the table."]]}
+];
+var LEVELS=[[900,"Manager of the Year","A safe pair of hands. Every team would love you on board."],[700,"Safe Pair of Hands","Strong instincts. You handled most of the day brilliantly."],[500,"Quick Learner","A solid first day. The explanations are worth a second look."],[0,"Welcome Aboard","Every manager has a tricky first day. Have another go!"]];
+function level(s){for(var i=0;i<LEVELS.length;i++)if(s>=LEVELS[i][0])return LEVELS[i];}
+var app=document.getElementById("app"), S;
+function tcss(k){return "--tc:"+TEAMS[k].color;}
+function fmt(s){var m=Math.floor(s/60),r=s%60;return (m<10?"0":"")+m+":"+(r<10?"0":"")+r;}
+function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]});}
+function cleanName(n){return String(n).replace(new RegExp("[\\u0000-\\u001f\\u007f\\u2028\\u2029]","g")," ").replace(/\s+/g," ").trim();}
+function cleanEmail(n){return cleanName(n).replace(/\s+/g,"").toLowerCase();}
+function validEmail(n){n=cleanEmail(n);if(!n)return "Please enter your email address.";if(n.length>80)return "That email looks too long.";if(!/^[a-z0-9._%+'-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(n))return "Please enter a valid email, like name@bnm.gov.my.";return "";}
+function fileSafe(n){var s=cleanEmail(n).replace(/[^a-z0-9._@+'-]/g,"_").replace(/^[._]+|[._]+$/g,"");return s||"player";}
+function firstName(e){var t=e.split("@")[0].split(/[._+\-0-9]+/)[0];return t?t.charAt(0).toUpperCase()+t.slice(1):"";}
+function runId(){return "MD-"+Math.random().toString(36).slice(2,8).toUpperCase();}
+
+
+function home(){
+ S=null;
+ var legend="";TEAM_ORDER.forEach(function(k){legend+='<span class="tag" style="'+tcss(k)+'">'+TEAMS[k].icon+" "+k+'</span> ';});
+ app.innerHTML='<div class="card"><div style="font-size:3rem">🏢</div><h1>Manager for a Day</h1>'+
+ '<p>Spend one working day, 9:00 to 16:00, running our department. Ten things will land on your desk. Choose what you would do, collect points, and meet the seven teams that keep everything running.</p>'+
+ '<p style="line-height:2">'+legend+'</p>'+
+ '<p class="mute small">About 5 minutes. No finance knowledge needed. Up to 100 points per moment, 1,000 in total.</p>'+
+ '<label for="nm"><b>Your email address</b></label><input id="nm" type="text" inputmode="email" maxlength="80" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="name@bnm.gov.my"><p class="mute small" style="margin:0 0 8px">Used only to name your results file. Nothing is sent anywhere.</p>'+
+ '<div class="err" id="err" role="alert"></div><button class="btn" id="go">Start my day</button></div>';
+ var nm=document.getElementById("nm");
+ function go(){var e=validEmail(nm.value);if(e){document.getElementById("err").textContent=e;nm.focus();return;}
+  S={email:cleanEmail(nm.value),id:runId(),start:new Date(),i:0,score:0,log:[],answered:false};ask();}
+ document.getElementById("go").onclick=go;
+ nm.onkeydown=function(e){if(e.key==="Enter")go();};
+ nm.focus();
+}
+function ask(){
+ var q=Q[S.i],T=TEAMS[q.team];S.answered=false;
+ var h='<div class="top"><span class="clock">🕘 '+q.time+'</span></div>'+
+ '<div class="bar"><div style="width:'+(S.i/Q.length*100)+'%"></div></div>'+
+ '<div class="card"><div class="team" style="'+tcss(q.team)+'"><span class="ic">'+T.icon+'</span><div><b><span class="tag" style="'+tcss(q.team)+'">'+q.team+'</span>'+esc(T.line)+'</b><span class="small mute">'+esc(T.what)+'</span></div></div>'+
+ '<h2>'+esc(q.t)+'</h2><p>'+esc(q.s)+'</p><p class="mute small">What would you do?</p>';
+ q.o.forEach(function(o,k){h+='<button class="opt" data-k="'+k+'">'+esc(o[0])+'</button>';});
+ h+='<div id="fb"></div></div>';
+ app.innerHTML=h;
+ Array.prototype.forEach.call(app.querySelectorAll(".opt"),function(b){b.onclick=function(){pick(+b.dataset.k);};});
+}
+function cls(p){return p===100?"best":p===50?"ok":"poor";}
+function pick(k){
+ if(S.answered)return;S.answered=true;
+ var q=Q[S.i],o=q.o[k];S.score+=o[1];
+ var best=q.o.filter(function(x){return x[1]===100})[0];
+ S.log.push({n:S.i+1,title:q.t,choice:o[0],points:o[1],outcome:o[1]===100?"Best choice":o[1]===50?"Partly right":"Risky",best:best[0]});
+ Array.prototype.forEach.call(app.querySelectorAll(".opt"),function(b,j){b.disabled=true;b.classList.add(cls(q.o[j][1]));if(j===k)b.classList.add("picked");});
+ var lab=o[1]===100?'<b class="g">Great call!</b>':o[1]===50?'<b class="m">Partly right.</b>':'<b class="b">Risky choice.</b>';
+ var more=o[1]===100?"":'<p class="small mute">Best answer: '+esc(best[0])+'</p>';
+ var last=S.i===Q.length-1;
+ document.getElementById("fb").innerHTML='<div class="fb" style="margin-top:14px">'+lab+'<p>'+esc(o[2])+'</p>'+more+
+  '<button class="btn" id="next">'+(last?"Close the day":"Next moment")+'</button></div>';
+ var nx=document.getElementById("next");nx.onclick=function(){if(last)finish();else{S.i++;ask();}};nx.focus();
+}
+function finish(){
+ S.end=new Date();S.secs=Math.max(0,Math.round((S.end-S.start)/1000));
+ var lv=level(S.score),right=S.log.filter(function(x){return x.points===100}).length;
+ S.level=lv[1];S.right=right;
+ var st="",meet="";
+ TEAM_ORDER.forEach(function(k){var T=TEAMS[k];
+  st+='<span class="stamp" style="'+tcss(k)+'">'+T.icon+" "+k+'</span>';
+  meet+='<li><span style="font-size:1.8rem">'+T.icon+'</span><div><b><span class="tag" style="'+tcss(k)+'">'+esc(TEAM_LONG[k])+'</span>'+esc(T.line)+'</b><br><span class="small mute">'+esc(T.what)+'</span></div></li>';});
+ app.innerHTML='<div class="card" style="text-align:center"><div style="font-size:3rem">🏆</div><h1>Day complete'+(firstName(S.email)?', '+esc(firstName(S.email)):'')+'!</h1>'+
+ '<p>Thanks for running the department for a day. Download your results file and hand it to a member of staff, who will check it for you.</p>'+
+ '<button class="btn" id="dl">⬇ Download my Excel results</button>'+
+ '<p class="small mute" style="margin:18px 0 0">Your passport: all 7 teams visited</p><div class="stamps">'+st+'</div>'+
+ '<button class="btn alt" id="again">Play again</button></div>'+
+ '<div class="card"><h2>Meet the teams</h2><ul class="meet">'+meet+'</ul></div>';
+ document.getElementById("dl").onclick=download;
+ document.getElementById("again").onclick=home;
+}
+/* ---------- Minimal genuine .xlsx writer (no libraries) ---------- */
+var CRC=(function(){var t=[],c,n,k;for(n=0;n<256;n++){c=n;for(k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(b){var c=0xFFFFFFFF;for(var i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function u8(s){return new TextEncoder().encode(s);}
+function le(n,b){var a=[];for(var i=0;i<b;i++)a.push((n>>>(8*i))&255);return a;}
+function zip(files){
+ var parts=[],cen=[],off=0,d=new Date();
+ var dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF, dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;
+ files.forEach(function(f){
+  var nm=u8(f[0]),data=u8(f[1]),crc=crc32(data);
+  var lh=[].concat(le(0x04034b50,4),le(20,2),le(0x0800,2),le(0,2),le(dt,2),le(dd,2),le(crc,4),le(data.length,4),le(data.length,4),le(nm.length,2),le(0,2));
+  parts.push(new Uint8Array(lh),nm,data);
+  cen.push({nm:nm,crc:crc,len:data.length,off:off});
+  off+=lh.length+nm.length+data.length;
+ });
+ var cs=off;
+ cen.forEach(function(c){
+  var h=[].concat(le(0x02014b50,4),le(20,2),le(20,2),le(0x0800,2),le(0,2),le(dt,2),le(dd,2),le(c.crc,4),le(c.len,4),le(c.len,4),le(c.nm.length,2),le(0,2),le(0,2),le(0,2),le(0,2),le(0,4),le(c.off,4));
+  parts.push(new Uint8Array(h),c.nm);off+=h.length+c.nm.length;
+ });
+ var end=[].concat(le(0x06054b50,4),le(0,2),le(0,2),le(cen.length,2),le(cen.length,2),le(off-cs,4),le(cs,4),le(0,2));
+ parts.push(new Uint8Array(end));
+ return new Blob(parts,{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function xesc(s){return String(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function colL(i){return String.fromCharCode(65+i);}
+function serial(d){return (d.getTime()-d.getTimezoneOffset()*60000)/86400000+25569;}
+/* cell: string | number | {d:Date}; styles: 1 header, 2 date */
+function sheet(rows,widths){
+ var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>';
+ widths.forEach(function(w,i){x+='<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';});
+ x+='</cols><sheetData>';
+ rows.forEach(function(r,ri){x+='<row r="'+(ri+1)+'">';
+  r.forEach(function(c,ci){var ref=colL(ci)+(ri+1);
+   if(ri===0)x+='<c r="'+ref+'" t="inlineStr" s="1"><is><t>'+xesc(c)+'</t></is></c>';
+   else if(c&&c.d)x+='<c r="'+ref+'" s="2"><v>'+serial(c.d)+'</v></c>';
+   else if(typeof c==="number")x+='<c r="'+ref+'"><v>'+c+'</v></c>';
+   else x+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xesc(c)+'</t></is></c>';});
+  x+='</row>';});
+ return x+'</sheetData></worksheet>';
+}
+function download(){
+ var W='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+ var files=[
+ ["[Content_Types].xml",W+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+ ["_rels/.rels",W+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+ ["xl/workbook.xml",W+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Results" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+ ["xl/_rels/workbook.xml.rels",W+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+ ["xl/styles.xml",W+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F4C75"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>'],
+ ["xl/worksheets/sheet1.xml",sheet([["Email","Total Score"],[S.email,S.score]],[34,14])]
+ ];
+ var blob=zip(files),name=fileSafe(S.email)+".xlsx";
+ var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+ setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
+}
+home();
+</script>
+</body>
+</html>
